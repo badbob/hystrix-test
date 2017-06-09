@@ -10,6 +10,7 @@ import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixThreadPoolKey;
 
 import rx.Single;
+import rx.subjects.ReplaySubject;
 
 public class HystrixObservableTest {
 
@@ -87,19 +88,29 @@ public class HystrixObservableTest {
 		}
 	}
 	
+	private static <T> Single<T> toReplayable(Single<T> single) {
+		ReplaySubject<T> subject = ReplaySubject.create();
+		single.subscribe(subject);
+		return subject.toSingle();
+	}
+	
+	private static <T> Single<T> toSingle(HystrixCommand<T> command) {
+		return command.observe().toSingle();
+	}
+	
 	private int barExecutionCounter, fooExecutionCounter, bazExecutionCounter, quxExecutionCounter = 0;
 	
 	@Test
 	public void testFoo() {
-		Single<String> single = new FooCommand().observe().toSingle().flatMap(
+		Single<String> single = toReplayable(toSingle(new FooCommand()).flatMap(
 				fooResult -> {
 					// New command creation
-					return new BarCommand(fooResult).observe().toSingle();
-				});
+					return toSingle(new BarCommand(fooResult));
+				}));
 		
-		Single<String> baz = new BazCommand().observe().toSingle()
+		Single<String> baz = toSingle(new BazCommand())
 				.zipWith(single, (first, second) -> first+second);
-		Single<String> qux = new QuxCommand().observe().toSingle()
+		Single<String> qux = toSingle(new QuxCommand())
 				.zipWith(single, (first, second) -> first+second);
 		
 		assertEquals("BazBar[Foo]QuxBar[Foo]", Single.zip(baz, qux, 
