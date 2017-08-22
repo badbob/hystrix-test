@@ -88,25 +88,25 @@ public class HystrixObservableTest {
 		}
 	}
 	
-	private static <T> Single<T> toReplayable(Single<T> single) {
-		ReplaySubject<T> subject = ReplaySubject.create();
-		single.subscribe(subject);
-		return subject.toSingle();
-	}
+//	private static <T> Single<T> toReplayable(Single<T> single) {
+//		ReplaySubject<T> subject = ReplaySubject.create();
+//		single.subscribe(subject);
+//		return subject.toSingle();
+//	}
 	
 	private static <T> Single<T> toSingle(HystrixCommand<T> command) {
-		return command.observe().toSingle();
+		return command.observe().cache().toSingle();
 	}
 	
 	private int barExecutionCounter, fooExecutionCounter, bazExecutionCounter, quxExecutionCounter = 0;
 	
 	@Test
 	public void testFoo() {
-		Single<String> single = toReplayable(toSingle(new FooCommand()).flatMap(
+		Single<String> single = toSingle(new FooCommand()).flatMap(
 				fooResult -> {
 					// New command creation
 					return toSingle(new BarCommand(fooResult));
-				}));
+				});
 		
 		Single<String> baz = toSingle(new BazCommand())
 				.zipWith(single, (first, second) -> first+second);
